@@ -11,6 +11,7 @@ This repo implements a secure IoT motion sensor system using:
 - **MQTT Protocol**: Lightweight messaging protocol used in IoT applications
 - **TLS 1.3**: Secure communication with PQC cipher suites
 
+## Design
 The system consists of three main components:
 1. **Broker**: MQTT broker terminal that facillitates communications between the publisher and subscriber nodes
 2. **Publisher**: Publisher terminal with an attached PIR motion sensor that detects and publishes motion events
@@ -160,3 +161,4 @@ Complete cleanup script for removing all PQC/MQTT components.
 - **/pqc-mqtt/** - Test files and certificates
 - **/pqc-mqtt/cert/** - CA and device certificates
 - **/usr/local/bin/mosquitto** - MQTT binaries
+
