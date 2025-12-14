@@ -160,4 +160,3 @@ Complete cleanup script for removing all PQC/MQTT components.
 - **/pqc-mqtt/** - Test files and certificates
 - **/pqc-mqtt/cert/** - CA and device certificates
 - **/usr/local/bin/mosquitto** - MQTT binaries
-# pqc-mqtt
