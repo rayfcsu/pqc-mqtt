@@ -106,7 +106,7 @@ openssl req -x509 -new -newkey $SIG_ALG \
     -out /pqc-mqtt/CA.crt \
     -nodes -subj "/O=pqc-mqtt-ca" -days 3650 > /dev/null 2>&1
 CERT_END=$(now_ns)
-CERT_TIME_NS=$(( (CERT_END - CERT_START) / 1000000000 ))
+CERT_TIME_NS=$((CERT_END - CERT_START))
 log_result "ca_generation" "$CERT_TIME_NS"
 
 # copy CA cert to publisher and subscriber
@@ -171,7 +171,7 @@ openssl x509 -req -in /pqc-mqtt/cert/broker.csr \
     -CAcreateserial -days 365 > /dev/null 2>&1
 
 BROKER_CERT_END=$(now_ns)
-BROKER_CERT_NS=$(( (BROKER_CERT_END - BROKER_CERT_START) / 1000000000 ))
+BROKER_CERT_NS=$((BROKER_CERT_END - BROKER_CERT_START))
 log_result "broker_cert" "$BROKER_CERT_NS"
 
 # modify file permissions

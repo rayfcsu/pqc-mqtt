@@ -50,12 +50,12 @@ openssl x509 -req -in /pqc-mqtt/cert/subscriber.csr \
   -CAcreateserial -days 365 > /dev/null 2>&1
 
 CERT_END=$(now_ns)
-CERT_NS=$(( (CERT_END - CERT_START) / 1000000000 ))
+CERT_NS=$((CERT_END - CERT_START))
 log_result "subscriber_cert" "$CERT_NS"
 
 chmod 777 /pqc-mqtt/cert/*
 
-# start the mosquitto MQTT subscriber
-mosquitto_sub -h $BROKER_IP -t pqc-mqtt-sensor/motion-sensor -q 0 -i "Client_sub" \
+# start the subscriber
+mosquitto_sub -h $BROKER_IP -t pqc-mqtt-sensor/motion-sensor -q 0 -i "Client_sub" -v \
 --tls-version tlsv1.3 --cafile /pqc-mqtt/cert/CA.crt \
---cert /pqc-mqtt/cert/subscriber.crt --key /pqc-mqtt/cert/subscriber.key | \
+--cert /pqc-mqtt/cert/subscriber.crt --key /pqc-mqtt/cert/subscriber.key

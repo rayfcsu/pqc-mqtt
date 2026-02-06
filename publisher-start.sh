@@ -67,7 +67,7 @@ openssl x509 -req -in /pqc-mqtt/cert/publisher.csr \
   -CAcreateserial -days 365 > /dev/null 2>&1
 
 CERT_END=$(now_ns)
-CERT_NS=$(( (CERT_END - CERT_START) / 1000000000 ))
+CERT_NS=$((CERT_END - CERT_START))
 log_result "publisher_cert" "$CERT_NS"
 
 chmod 777 /pqc-mqtt/cert/* 2>/dev/null || true
