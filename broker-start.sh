@@ -37,12 +37,6 @@ copy_ca_certificate() {
     fi
 }
 
-########## instrumentation ##########
-
-# set the alg and log vars
-PQC_ALG=${PQC_ALG:-falcon1024}
-RESULTS_FILE=${RESULTS_FILE:-results.csv}
-
 now_ns() {
     date +%s%N
 }
@@ -51,7 +45,27 @@ log_result() {
     echo "$PQC_ALG,$1,$2" >> "$RESULTS_FILE"
 }
 
+# trap ctrl + c for cleanup efforts
+cleanup() {
+    echo ""
+    echo "Stopping broker (PID: $BROKER_PID)..."
+    kill $BROKER_PID 2>/dev/null
+    wait $BROKER_PID 2>/dev/null
+    echo "Broker stopped."
+    echo "Final results in: $RESULTS_FILE"
+    exit 0
+}
+
+########## instrumentation ##########
+
+# set the alg and log vars
+PQC_ALG=${PQC_ALG:-falcon1024}
+RESULTS_FILE=${RESULTS_FILE:-results.csv}
+
 ########## initialization ##########
+
+# create the results file
+touch "$RESULTS_FILE"
 
 # configure the PQC setup
 if [ "$PQC_ALG" = "rsa" ]; then
@@ -65,8 +79,7 @@ export LD_LIBRARY_PATH=/opt/oqssa/lib64
 export OPENSSL_CONF=/opt/oqssa/ssl/openssl.cnf
 export PATH="/usr/local/bin:/usr/local/sbin:${INSTALLDIR}/bin:$PATH"
 
-########## IP configuration ##########
-
+# configure the IP addresses 
 echo "------------------------------------------------------"
 read -p "Enter broker IP address: " BROKER_IP
 BROKER_IP=${BROKER_IP:-localhost}
@@ -158,8 +171,8 @@ openssl x509 -req -in /pqc-mqtt/cert/broker.csr \
     -CAcreateserial -days 365 > /dev/null 2>&1
 
 BROKER_CERT_END=$(now_ns)
-BROKER_CERT_MS=$(( (BROKER_CERT_END - BROKER_CERT_START) / 1000000 ))
-log_result "broker_cert" "$BROKER_CERT_MS"
+BROKER_CERT_NS=$(( (BROKER_CERT_END - BROKER_CERT_START) / 1000000000 ))
+log_result "broker_cert" "$BROKER_CERT_NS"
 
 chmod 777 /pqc-mqtt/cert/*
 
@@ -176,7 +189,16 @@ for i in {1..30}; do
 done
 
 BROKER_READY=$(now_ns)
-BROKER_START_MS=$(( (BROKER_READY - BROKER_START) / 1000000 ))
-log_result "broker_startup" "$BROKER_START_MS"
+BROKER_START_NS=$(( (BROKER_READY - BROKER_START) / 1000000000 ))
+log_result "broker_startup" "$BROKER_START_NS"
 
+echo "------------------------------------------------------"
+echo "Broker is running on port 8883 (PID: $BROKER_PID)"
+echo "Results saved to: $RESULTS_FILE"
+echo "Press Ctrl+C to stop the broker"
+echo "------------------------------------------------------"
+
+trap cleanup INT TERM
+
+# wait for broker
 wait $BROKER_PID

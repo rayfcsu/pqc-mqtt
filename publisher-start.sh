@@ -63,8 +63,8 @@ openssl x509 -req -in /pqc-mqtt/cert/publisher.csr \
   -CAcreateserial -days 365 > /dev/null 2>&1
 
 CERT_END=$(now_ns)
-CERT_MS=$(( (CERT_END - CERT_START) / 1000000 ))
-log_result "publisher_cert" "$CERT_MS"
+CERT_NS=$(( (CERT_END - CERT_START) / 1000000000 ))
+log_result "publisher_cert" "$CERT_NS"
 
 chmod 777 /pqc-mqtt/cert/* 2>/dev/null || true
 
@@ -93,7 +93,7 @@ trap cleanup INT TERM EXIT
 # infinite (until terminated) motion sensor loop
 while true; do
     current_state=$(sudo gpioget $GPIO_CHIP $MOTION_PIN 2>/dev/null || echo "error")
-    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S:%N')
     
     # check if the pins can be read
     if [ "$current_state" = "error" ]; then
