@@ -28,13 +28,13 @@ export LD_LIBRARY_PATH=/opt/oqssa/lib64
 export OPENSSL_CONF=/opt/oqssa/ssl/openssl.cnf
 export PATH="/usr/local/bin:/usr/local/sbin:${INSTALLDIR}/bin:$PATH"
 
-# configure the ip addresses 
-echo "------------------------------------------------------"
-read -p "Enter broker IP address: " BROKER_IP
+# load the ip addresses
+echo "source /pqc-env.sh" >> ~/.bashrc
 BROKER_IP=${BROKER_IP:-localhost}
-read -p "Enter subscriber IP address: " SUB_IP
+echo "Using broker IP:     $BROKER_IP"
 SUB_IP=${SUB_IP:-localhost}
-echo "------------------------------------------------------"
+echo "Using subscriber IP: $SUB_IP"
+
 
 # time the cert generation
 CERT_START=$(now_ns)
