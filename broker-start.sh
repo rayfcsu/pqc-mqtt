@@ -2,6 +2,7 @@
 # this script is a modified version of what Chia-Chin Chung <60947091s@gapps.ntnu.edu.tw> wrote for oqs-demos/mosquitto
 
 ########## functions ##########
+
 copy_ca_certificate() {
     local user=$1
     local host=$2
@@ -36,16 +37,36 @@ copy_ca_certificate() {
     fi
 }
 
+########## instrumentation ##########
+
+# set the alg and log vars
+PQC_ALG=${PQC_ALG:-falcon1024}
+RESULTS_FILE=${RESULTS_FILE:-results.csv}
+
+now_ns() {
+    date +%s%N
+}
+
+log_result() {
+    echo "$PQC_ALG,$1,$2" >> "$RESULTS_FILE"
+}
+
 ########## initialization ##########
 
-# configure the PQC setup 
-SIG_ALG="falcon1024"
+# configure the PQC setup
+if [ "$PQC_ALG" = "rsa" ]; then
+    SIG_ALG="rsa:2048"
+else
+    SIG_ALG="falcon1024"
+fi
+
 INSTALLDIR="/opt/oqssa"
 export LD_LIBRARY_PATH=/opt/oqssa/lib64
 export OPENSSL_CONF=/opt/oqssa/ssl/openssl.cnf
 export PATH="/usr/local/bin:/usr/local/sbin:${INSTALLDIR}/bin:$PATH"
 
-# configure the ip addresses
+########## IP configuration ##########
+
 echo "------------------------------------------------------"
 read -p "Enter broker IP address: " BROKER_IP
 BROKER_IP=${BROKER_IP:-localhost}
@@ -61,12 +82,19 @@ read -p "Enter SSH username for PUBLISHER ($PUB_IP): " PUB_USER
 read -p "Enter SSH username for SUBSCRIBER ($SUB_IP): " SUB_USER
 echo "------------------------------------------------------"
 
-
 ########## main ##########
 
 # generate the CA key and PQC certificates; suppress output
 cd /pqc-mqtt
-openssl req -x509 -new -newkey $SIG_ALG -keyout /pqc-mqtt/CA.key -out /pqc-mqtt/CA.crt -nodes -subj "/O=pqc-mqtt-ca" -days 3650 > /dev/null 2>&1
+
+CERT_START=$(now_ns)
+openssl req -x509 -new -newkey $SIG_ALG \
+    -keyout /pqc-mqtt/CA.key \
+    -out /pqc-mqtt/CA.crt \
+    -nodes -subj "/O=pqc-mqtt-ca" -days 3650 > /dev/null 2>&1
+CERT_END=$(now_ns)
+CERT_TIME_MS=$(( (CERT_END - CERT_START) / 1000000 ))
+log_result "ca_generation" "$CERT_TIME_MS"
 
 # copy CA cert to publisher and subscriber
 if [ "$PUB_IP" != "localhost" ] && [ -n "$PUB_USER" ]; then
@@ -116,12 +144,39 @@ mkdir -p /pqc-mqtt/cert
 # copy the CA key and the cert to the cert folder
 cp /pqc-mqtt/CA.key /pqc-mqtt/CA.crt /pqc-mqtt/cert
 
-# generate the new server CSR and cert using pre-set CA.key & cert; suppress output
-openssl req -new -newkey $SIG_ALG -keyout /pqc-mqtt/cert/broker.key -out /pqc-mqtt/cert/broker.csr -nodes -subj "/O=pqc-mqtt-broker/CN=$BROKER_IP" > /dev/null 2>&1
-openssl x509 -req -in /pqc-mqtt/cert/broker.csr -out /pqc-mqtt/cert/broker.crt -CA /pqc-mqtt/cert/CA.crt -CAkey /pqc-mqtt/cert/CA.key -CAcreateserial -days 365 > /dev/null 2>&1
+# time the cert generation
+BROKER_CERT_START=$(now_ns)
+openssl req -new -newkey $SIG_ALG \
+    -keyout /pqc-mqtt/cert/broker.key \
+    -out /pqc-mqtt/cert/broker.csr \
+    -nodes -subj "/O=pqc-mqtt-broker/CN=$BROKER_IP" > /dev/null 2>&1
 
-# modify file permissions
+openssl x509 -req -in /pqc-mqtt/cert/broker.csr \
+    -out /pqc-mqtt/cert/broker.crt \
+    -CA /pqc-mqtt/cert/CA.crt \
+    -CAkey /pqc-mqtt/cert/CA.key \
+    -CAcreateserial -days 365 > /dev/null 2>&1
+
+BROKER_CERT_END=$(now_ns)
+BROKER_CERT_MS=$(( (BROKER_CERT_END - BROKER_CERT_START) / 1000000 ))
+log_result "broker_cert" "$BROKER_CERT_MS"
+
 chmod 777 /pqc-mqtt/cert/*
 
-# execute the mosquitto MQTT broker
-mosquitto -c mosquitto.conf -v
+# time the starting of the broker
+BROKER_START=$(now_ns)
+mosquitto -c mosquitto.conf -v &
+BROKER_PID=$!
+
+for i in {1..30}; do
+    if nc -z localhost 8883 2>/dev/null; then
+        break
+    fi
+    sleep 0.1
+done
+
+BROKER_READY=$(now_ns)
+BROKER_START_MS=$(( (BROKER_READY - BROKER_START) / 1000000 ))
+log_result "broker_startup" "$BROKER_START_MS"
+
+wait $BROKER_PID

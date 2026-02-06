@@ -2,6 +2,7 @@
 # this script is a modified version of what Chia-Chin Chung <60947091s@gapps.ntnu.edu.tw> wrote for oqs-demos/mosquitto
 
 ########## functions ##########
+
 cleanup() {
     echo "------------------------------------------------------"
     echo "Cleaning up..."
@@ -12,16 +13,29 @@ cleanup() {
     exit 0
 }
 
+########## instrumentation ##########
+
+PQC_ALG=${PQC_ALG:-falcon1024}
+RESULTS_FILE=${RESULTS_FILE:-results.csv}
+
+now_ns() { date +%s%N; }
+log_result() { echo "$PQC_ALG,$1,$2" >> "$RESULTS_FILE"; }
+
 ########## initialization ##########
 
 # define the motion sensor circuit config vars
-GPIO_CHIP="gpiochip0"  # RP1 chip on Pi 5
-MOTION_PIN=14          # BCM14 - Physical pin 8
-LED_DETECT_PIN=20      # BCM20 - Physical pin 38
-LED_STATUS_PIN=21      # BCM21 - Physical pin 40
+GPIO_CHIP="gpiochip0"
+MOTION_PIN=14
+LED_DETECT_PIN=20
+LED_STATUS_PIN=21
 
 # configure the PQC setup 
-SIG_ALG="falcon1024"
+if [ "$PQC_ALG" = "rsa" ]; then
+    SIG_ALG="rsa:2048"
+else
+    SIG_ALG="falcon1024"
+fi
+
 INSTALLDIR="/opt/oqssa"
 export LD_LIBRARY_PATH=/opt/oqssa/lib64
 export OPENSSL_CONF=/opt/oqssa/ssl/openssl.cnf
@@ -35,9 +49,23 @@ read -p "Enter publisher IP address: " PUB_IP
 PUB_IP=${PUB_IP:-localhost}
 echo "------------------------------------------------------"
 
-# generate the publisher PQC certificates; suppress output
-openssl req -new -newkey $SIG_ALG -keyout /pqc-mqtt/cert/publisher.key -out /pqc-mqtt/cert/publisher.csr -nodes -subj "/O=pqc-mqtt-publisher/CN=$PUB_IP" > /dev/null 2>&1
-openssl x509 -req -in /pqc-mqtt/cert/publisher.csr -out /pqc-mqtt/cert/publisher.crt -CA /pqc-mqtt/cert/CA.crt -CAkey /pqc-mqtt/cert/CA.key -CAcreateserial -days 365 > /dev/null 2>&1
+# time the cert generation
+CERT_START=$(now_ns)
+openssl req -new -newkey $SIG_ALG \
+  -keyout /pqc-mqtt/cert/publisher.key \
+  -out /pqc-mqtt/cert/publisher.csr \
+  -nodes -subj "/O=pqc-mqtt-publisher/CN=$PUB_IP" > /dev/null 2>&1
+
+openssl x509 -req -in /pqc-mqtt/cert/publisher.csr \
+  -out /pqc-mqtt/cert/publisher.crt \
+  -CA /pqc-mqtt/cert/CA.crt \
+  -CAkey /pqc-mqtt/cert/CA.key \
+  -CAcreateserial -days 365 > /dev/null 2>&1
+
+CERT_END=$(now_ns)
+CERT_MS=$(( (CERT_END - CERT_START) / 1000000 ))
+log_result "publisher_cert" "$CERT_MS"
+
 chmod 777 /pqc-mqtt/cert/* 2>/dev/null || true
 
 # initialize the motion sensor
