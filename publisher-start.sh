@@ -13,15 +13,19 @@ cleanup() {
     exit 0
 }
 
-########## instrumentation ##########
+now_ns() {
+    date +%s%N
+}
 
-PQC_ALG=${PQC_ALG:-falcon1024}
-RESULTS_FILE=${RESULTS_FILE:-results.csv}
-
-now_ns() { date +%s%N; }
-log_result() { echo "$PQC_ALG,$1,$2" >> "$RESULTS_FILE"; }
+log_result() {
+    echo "$PQC_ALG,$1,$2" >> "$RESULTS_FILE"
+}
 
 ########## initialization ##########
+
+# define the test vars
+PQC_ALG=${PQC_ALG:-falcon1024}
+RESULTS_FILE=${RESULTS_FILE:-results.csv}
 
 # define the motion sensor circuit config vars
 GPIO_CHIP="gpiochip0"

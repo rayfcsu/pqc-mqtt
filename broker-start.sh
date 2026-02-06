@@ -97,7 +97,7 @@ echo "------------------------------------------------------"
 
 ########## main ##########
 
-# generate the CA key and PQC certificates; suppress output
+# generate & time the CA key and PQC certificates; suppress output
 cd /pqc-mqtt
 
 CERT_START=$(now_ns)
@@ -106,8 +106,8 @@ openssl req -x509 -new -newkey $SIG_ALG \
     -out /pqc-mqtt/CA.crt \
     -nodes -subj "/O=pqc-mqtt-ca" -days 3650 > /dev/null 2>&1
 CERT_END=$(now_ns)
-CERT_TIME_MS=$(( (CERT_END - CERT_START) / 1000000 ))
-log_result "ca_generation" "$CERT_TIME_MS"
+CERT_TIME_NS=$(( (CERT_END - CERT_START) / 1000000000 ))
+log_result "ca_generation" "$CERT_TIME_NS"
 
 # copy CA cert to publisher and subscriber
 if [ "$PUB_IP" != "localhost" ] && [ -n "$PUB_USER" ]; then
@@ -174,31 +174,8 @@ BROKER_CERT_END=$(now_ns)
 BROKER_CERT_NS=$(( (BROKER_CERT_END - BROKER_CERT_START) / 1000000000 ))
 log_result "broker_cert" "$BROKER_CERT_NS"
 
+# modify file permissions
 chmod 777 /pqc-mqtt/cert/*
 
-# time the starting of the broker
-BROKER_START=$(now_ns)
-mosquitto -c mosquitto.conf -v &
-BROKER_PID=$!
-
-for i in {1..30}; do
-    if nc -z localhost 8883 2>/dev/null; then
-        break
-    fi
-    sleep 0.1
-done
-
-BROKER_READY=$(now_ns)
-BROKER_START_NS=$(( (BROKER_READY - BROKER_START) / 1000000000 ))
-log_result "broker_startup" "$BROKER_START_NS"
-
-echo "------------------------------------------------------"
-echo "Broker is running on port 8883 (PID: $BROKER_PID)"
-echo "Results saved to: $RESULTS_FILE"
-echo "Press Ctrl+C to stop the broker"
-echo "------------------------------------------------------"
-
-trap cleanup INT TERM
-
-# wait for broker
-wait $BROKER_PID
+# execute the mosquitto MQTT broker
+mosquitto -c mosquitto.conf -v
