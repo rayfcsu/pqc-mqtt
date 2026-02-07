@@ -3,6 +3,7 @@
 
 ########## functions ##########
 
+# to exit cleanly and terminate the GPIO pins
 cleanup() {
     echo "------------------------------------------------------"
     echo "Cleaning up..."
@@ -13,19 +14,28 @@ cleanup() {
     exit 0
 }
 
+# to pretty print the time in nanoseconds
 now_ns() {
     date +%s%N
 }
 
+# to log the cert gen time to ./results.csv
 log_result() {
     echo "$PQC_ALG,$1,$2" >> "$RESULTS_FILE"
 }
 
 ########## initialization ##########
 
-# define the test vars
+# set the alg and log vars
 PQC_ALG=${PQC_ALG:-falcon1024}
 RESULTS_FILE=${RESULTS_FILE:-results.csv}
+
+# define the signature algorithm(s) in use
+if [ "$PQC_ALG" = "rsa" ]; then
+    SIG_ALG="rsa:2048"
+else
+    SIG_ALG="falcon1024"
+fi
 
 # define the motion sensor circuit config vars
 GPIO_CHIP="gpiochip0"
@@ -33,26 +43,22 @@ MOTION_PIN=14
 LED_DETECT_PIN=20
 LED_STATUS_PIN=21
 
-# configure the PQC setup 
-if [ "$PQC_ALG" = "rsa" ]; then
-    SIG_ALG="rsa:2048"
-else
-    SIG_ALG="falcon1024"
-fi
-
+# define the install and library paths
 INSTALLDIR="/opt/oqssa"
 export LD_LIBRARY_PATH=/opt/oqssa/lib64
 export OPENSSL_CONF=/opt/oqssa/ssl/openssl.cnf
 export PATH="/usr/local/bin:/usr/local/sbin:${INSTALLDIR}/bin:$PATH"
 
 # load the ip addresses
-echo "source /pqc-env.sh" >> ~/.bashrc
+source ./pqc-env.sh
+echo "------------------------------------------------------"
 BROKER_IP=${BROKER_IP:-localhost}
 echo "Using broker IP:     $BROKER_IP"
 PUB_IP=${PUB_IP:-localhost}
 echo "Using subscriber IP: $PUB_IP"
+echo "------------------------------------------------------"
 
-# time the cert generation
+# time & generate the certificates
 CERT_START=$(now_ns)
 openssl req -new -newkey $SIG_ALG \
   -keyout /pqc-mqtt/cert/publisher.key \
@@ -67,8 +73,11 @@ openssl x509 -req -in /pqc-mqtt/cert/publisher.csr \
 
 CERT_END=$(now_ns)
 CERT_NS=$((CERT_END - CERT_START))
+
+# log the results 
 log_result "publisher_cert" "$CERT_NS"
 
+# give mosquitto permissions to the working directory
 chmod 777 /pqc-mqtt/cert/* 2>/dev/null || true
 
 # initialize the motion sensor
@@ -92,6 +101,8 @@ first_run=true
 
 # setup trap for cleanup
 trap cleanup INT TERM EXIT
+
+########## main ##########
 
 # infinite (until terminated) motion sensor loop
 while true; do
@@ -132,7 +143,7 @@ while true; do
         sleep 0.25
         sudo gpioset $GPIO_CHIP $LED_DETECT_PIN=0
         
-        # Publish to MQTT
+        # publish to mosquitto
         message="[$timestamp]  :   Motion detected."
         if mosquitto_pub -h $BROKER_IP -m "$message" -t "pqc-mqtt-sensor/motion-sensor" -q 0 -i "MotionSensor_pub" \
             --tls-version tlsv1.3 --cafile /pqc-mqtt/cert/CA.crt \

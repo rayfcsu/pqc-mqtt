@@ -1,1 +1,2 @@
-./pqc-env.sh
+# ignore the ip address file
+pqc-env.sh

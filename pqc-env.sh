@@ -1,3 +1,0 @@
-export BROKER_IP=100.84.122.112
-export PUB_IP=100.123.209.74
-export SUB_IP=100.69.125.73

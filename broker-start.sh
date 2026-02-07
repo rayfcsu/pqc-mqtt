@@ -3,6 +3,7 @@
 
 ########## functions ##########
 
+# to scp CA cert and CA key to publisher and subscriber from the broker
 copy_ca_certificate() {
     local user=$1
     local host=$2
@@ -37,10 +38,12 @@ copy_ca_certificate() {
     fi
 }
 
+# to pretty print the time in nanoseconds
 now_ns() {
     date +%s%N
 }
 
+# to log the cert gen time to ./results.csv
 log_result() {
     echo "$PQC_ALG,$1,$2" >> "$RESULTS_FILE"
 }
@@ -56,37 +59,37 @@ cleanup() {
     exit 0
 }
 
-########## instrumentation ##########
+########## initialization ##########
 
 # set the alg and log vars
 PQC_ALG=${PQC_ALG:-falcon1024}
 RESULTS_FILE=${RESULTS_FILE:-results.csv}
 
-########## initialization ##########
-
 # create the results file
 touch "$RESULTS_FILE"
 
-# configure the PQC setup
+# define the signature algorithm(s) in use
 if [ "$PQC_ALG" = "rsa" ]; then
     SIG_ALG="rsa:2048"
 else
     SIG_ALG="falcon1024"
 fi
 
+# define the install and library paths
 INSTALLDIR="/opt/oqssa"
 export LD_LIBRARY_PATH=/opt/oqssa/lib64
 export OPENSSL_CONF=/opt/oqssa/ssl/openssl.cnf
 export PATH="/usr/local/bin:/usr/local/sbin:${INSTALLDIR}/bin:$PATH"
 
-# configure the IP addresses 
+# load the ip addresses
+source ./pqc-env.sh
 echo "------------------------------------------------------"
-read -p "Enter broker IP address: " BROKER_IP
 BROKER_IP=${BROKER_IP:-localhost}
-read -p "Enter publisher IP address: " PUB_IP
+echo "Using broker IP:     $BROKER_IP"
 PUB_IP=${PUB_IP:-localhost}
-read -p "Enter subscriber IP address: " SUB_IP
+echo "Using publisher IP: $PUB_IP"
 SUB_IP=${SUB_IP:-localhost}
+echo "Using subscriber IP: $SUB_IP"
 echo "------------------------------------------------------"
 
 # get SCP configuration
@@ -97,16 +100,23 @@ echo "------------------------------------------------------"
 
 ########## main ##########
 
-# generate & time the CA key and PQC certificates; suppress output
+# enter the working directory
 cd /pqc-mqtt
 
+# create the cert directory
+mkdir -p /pqc-mqtt/cert
+
+# generate & time the CA key and PQC certificates; suppress output
 CERT_START=$(now_ns)
 openssl req -x509 -new -newkey $SIG_ALG \
-    -keyout /pqc-mqtt/CA.key \
-    -out /pqc-mqtt/CA.crt \
+    -keyout /pqc-mqtt/cert/CA.key \
+    -out /pqc-mqtt/cert/CA.crt \
     -nodes -subj "/O=pqc-mqtt-ca" -days 3650 > /dev/null 2>&1
+
 CERT_END=$(now_ns)
 CERT_TIME_NS=$((CERT_END - CERT_START))
+
+# log the results
 log_result "ca_generation" "$CERT_TIME_NS"
 
 # copy CA cert to publisher and subscriber
@@ -128,34 +138,26 @@ max_connections -1
 max_qos 2
 protocol mqtt
 
-## General configuration
+## general config
 allow_anonymous false
 
-## Certificate based SSL/TLS support
+## cert based ssl/tls support
 cafile /pqc-mqtt/cert/CA.crt
 keyfile /pqc-mqtt/cert/broker.key
 certfile /pqc-mqtt/cert/broker.crt
 tls_version tlsv1.3
 ciphers_tls1.3 TLS_AES_128_GCM_SHA256
 
-# Comment out the following two lines if using one-way authentication
+## authentication 
 require_certificate true
-
-## Same as above
 use_identity_as_username true
 " > mosquitto.conf
 
 # generate the password file(add username and password) for the mosquitto MQTT broker
 mosquitto_passwd -b -c passwd broker 12345
 
-# generate the Access Control List
+# generate the access control list
 echo -e "user broker\ntopic readwrite pqc-mqtt-sensor/motion-sensor" > acl
-
-# create the cert directory
-mkdir -p /pqc-mqtt/cert
-
-# copy the CA key and the cert to the cert folder
-cp /pqc-mqtt/CA.key /pqc-mqtt/CA.crt /pqc-mqtt/cert
 
 # time the cert generation
 BROKER_CERT_START=$(now_ns)
@@ -172,9 +174,11 @@ openssl x509 -req -in /pqc-mqtt/cert/broker.csr \
 
 BROKER_CERT_END=$(now_ns)
 BROKER_CERT_NS=$((BROKER_CERT_END - BROKER_CERT_START))
+
+# log the results
 log_result "broker_cert" "$BROKER_CERT_NS"
 
-# modify file permissions
+# give mosquitto permissions to the working directory
 chmod 777 /pqc-mqtt/cert/*
 
 # execute the mosquitto MQTT broker
