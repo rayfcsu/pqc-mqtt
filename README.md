@@ -53,6 +53,16 @@ After that, setup the motion detection system circuit the same as below:
 
 *Source: https://opensource.com/article/20/11/motion-detection-raspberry-pi*
 
+Finally, export your IP address configurations to a file named pqc-env.sh. This is referenced in the setup scripts for the broker, subscriber, and publisher as to avoid repeated entry of the data. Configure it like so:
+
+```
+export BROKER_IP=<broker_ip>
+export PUB_IP=<publisher_ip>
+export SUB_IP=<subscriber_ip>
+```
+
+This file in the repository is ignored by default. 
+
 ### 2. Certificate Authority (CA) & Broker Setup
 
 Start the broker to generate CA certificates and configure the MQTT server:
@@ -60,11 +70,6 @@ Start the broker to generate CA certificates and configure the MQTT server:
 chmod +x broker-start.sh && \
 sudo ./broker-start.sh
 ```
-
-When prompted, provide:
-- Broker IP address
-- Publisher IP address & host username 
-- Subscriber IP address & host username
 
 The script will:
 - Generate CA key and certificate using Falcon-1024
@@ -82,10 +87,6 @@ chmod +x publisher-start.sh && \
 sudo ./publisher-start.sh
 ```
 
-When prompted, provide:
-- Broker IP address
-- Publisher IP address
-
 Hardware Configuration (default):
 - Motion Sensor: GPIO14 (BCM14, Physical pin 8)
 - Status LED: GPIO21 (BCM21, Physical pin 40)
@@ -102,21 +103,23 @@ The publisher will:
 
 ### 4. Subscriber Setup
 
-On the client device that should receive the motion notifications:
+On the Raspberry Pi that should receive the motion notifications:
 ```bash
 chmod +x subscriber-start.sh && \
 sudo ./subscriber-start.sh
 ```
-
-When prompted, provide:
-- Broker IP address
-- Subscriber IP address
 
 The subscriber will:
 - Generate its PQC certificate using the CA
 - Connect to the broker with PQC-secured TLS 1.3
 - Subscribe to the motion sensor topic
 - Display real-time motion notifications
+
+### 5. Testing
+
+On both the subscriber and publisher, there are scripts that allow for simple testing of certificate generation time complexity. To run such tests, execute the appropriate script for its respective node (i.e. running run-publisher-tests.sh on the publisher device). 
+
+All collected data is output to a CSV in the ```~/pqc-mqtt``` working directory called 'results.csv'. Because Mosquitto is a persistent service, to test the time complexity, one must terminate each session after it successfully completes the certificate generation of the *-start* script. This is sufficient enough for gathering details on time spent, however.
 
 ## Cleanup
 To completely remove the PQC/MQTT installation and clean up all files:
@@ -149,11 +152,11 @@ MQTT subscriber client for receiving motion notifications.
 ### pqc-mqtt-env-cleanup.sh
 Complete cleanup script for removing all PQC/MQTT components.
 
-## Security Features
+### run-subscriber-tests.sh
+Script that iteratively tests the certificate generation time for the subscriber node.
 
-- PQC: Falcon-1024 for signatures, ML-KEM for key exchange
-- TLS: Both client and server authentication
-- Access Controls: MQTT topic-based ACLs
+### run-publisher-tests.sh
+Script that iteratively tests the certificate generation time for the publisher node. 
 
 ## Files and Directories
 
@@ -161,4 +164,5 @@ Complete cleanup script for removing all PQC/MQTT components.
 - **/pqc-mqtt/** - Test files and certificates
 - **/pqc-mqtt/cert/** - CA and device certificates
 - **/usr/local/bin/mosquitto** - MQTT binaries
+
 
