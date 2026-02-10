@@ -119,7 +119,7 @@ The subscriber will:
 
 On both the subscriber and publisher, there are scripts that allow for simple testing of certificate generation time complexity. To run such tests, execute the appropriate script for its respective node (i.e. running run-publisher-tests.sh on the publisher device). 
 
-All collected data is output to a CSV in the ```~/pqc-mqtt``` working directory called 'results.csv'. Because Mosquitto is a persistent service, to test the time complexity, one must terminate each session after it successfully completes the certificate generation of the *-start* script. This is sufficient enough for gathering details on time spent, however.
+All collected data is output to a CSV in the ```~/pqc-mqtt``` working directory called ```results.csv```. Because Mosquitto is a persistent service, to test the time complexity, one must terminate each session after it successfully completes the certificate generation of the ```-start``` script. This is sufficient enough for gathering details on time spent, however.
 
 ## Cleanup
 To completely remove the PQC/MQTT installation and clean up all files:
@@ -164,5 +164,6 @@ Script that iteratively tests the certificate generation time for the publisher 
 - **/pqc-mqtt/** - Test files and certificates
 - **/pqc-mqtt/cert/** - CA and device certificates
 - **/usr/local/bin/mosquitto** - MQTT binaries
+
 
 
